@@ -32,20 +32,25 @@ struct AltStatusRow: View, Sendable {
             avatar
             VStack(alignment: .leading) {
                 header
-                content
-                if hover {
+                ZStack(alignment: .bottom) {
+                    content
                     footer
+                        .background(.ultraThinMaterial)
+                        .offset(x: 0, y: 12.0)
+                        .opacity(hover ? 1.0 : 0.0)
+                        .disabled(!hover)
                 }
             }
         }
-        .padding(.vertical, 2.0)
+        .padding(.top, 2.0)
+        .padding(.bottom, 8.0)
         .listRowSeparator(.visible, edges: .bottom)
         .listRowSeparatorTint(.secondary.opacity(0.1), edges: .bottom)
         .onHover { hover in
             if self.hover != hover {
-//                withAnimation(.easeIn(duration: 0.5)) {
+                withAnimation(.easeInOut(duration: 0.1)) {
                     self.hover = hover
-//                }
+                }
             }
         }
     }
