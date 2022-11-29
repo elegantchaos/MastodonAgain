@@ -397,17 +397,17 @@ public extension Image {
 
 public extension Image {
     init(url: URL) throws {
-#if os(macOS)
-        guard let nsImage = NSImage(contentsOf: url) else {
-            throw MastodonError.generic("Could not load image")
-        }
-        self = Image(nsImage: nsImage)
-#else
-        guard let uiImage = UIImage(contentsOfFile: url.path) else {
-            throw MastodonError.generic("Could not load image")
-        }
-        self = Image(uiImage: uiImage)
-#endif
+        #if os(macOS)
+            guard let nsImage = NSImage(contentsOf: url) else {
+                throw MastodonError.generic("Could not load image")
+            }
+            self = Image(nsImage: nsImage)
+        #else
+            guard let uiImage = UIImage(contentsOfFile: url.path) else {
+                throw MastodonError.generic("Could not load image")
+            }
+            self = Image(uiImage: uiImage)
+        #endif
     }
 }
 
@@ -416,12 +416,12 @@ extension Image: @unchecked Sendable {
 }
 
 public extension URLCache {
-    static let imageCache = URLCache(memoryCapacity: 512*1000*1000, diskCapacity: 10*1000*1000*1000)
+    static let imageCache = URLCache(memoryCapacity: 512 * 1000 * 1000, diskCapacity: 10 * 1000 * 1000 * 1000)
 }
 
 func standardResponse<T>(_ type: T.Type) -> some ResultGenerator where T: Decodable {
     IfStatus(200) { data, response in
-        print("X-RateLimit-Remaining: \(String(describing: response.value(forHTTPHeaderField: "X-RateLimit-Remaining")))")
+        print("\(response.url?.path ?? "<?>"): X-RateLimit-Remaining: \(String(describing: response.value(forHTTPHeaderField: "X-RateLimit-Remaining")))")
         return try JSONDecoder.mastodonDecoder.decode(T.self, from: data)
     }
 }
@@ -431,8 +431,16 @@ public extension Account {
         (displayName.isEmpty ? username ?? acct : displayName)
     }
 
+    var shortUsername: String {
+        acct
+    }
+
     var fullUsername: String {
         // TODO:
         acct
+    }
+
+    var instanceHost: String? {
+        url?.host
     }
 }

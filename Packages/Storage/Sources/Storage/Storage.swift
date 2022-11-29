@@ -3,6 +3,8 @@ import AsyncAlgorithms
 import Foundation
 @_implementationOnly import os
 
+// swiftlint:disable file_length
+
 // TODO: Temporary
 // swiftlint:disable fatal_error_message
 
@@ -57,8 +59,14 @@ public actor Storage {
             try data.forEach { key, value in
                 let (type, data) = value
                 let decoder = try registration.decoders[type].safelyUnwrap(StorageError.noDecoderFound(type))
-                let value = try decoder(data)
-                cache[key] = Record(type: type, value: .raw(value))
+                do {
+                    let value = try decoder(data)
+                    cache[key] = Record(type: type, value: .raw(value))
+                }
+                catch {
+                    logger?.error("Failed to decode: \(error)")
+                    fatalError()
+                }
             }
 
             if compact {
@@ -70,7 +78,7 @@ public actor Storage {
             self.cache = cache
         }
         else {
-            self.cache = [:]
+            cache = [:]
             log = try .init(path: path)
         }
     }
@@ -85,7 +93,7 @@ public actor Storage {
         return try FileManager().attributesOfItem(atPath: log.path)[.size] as! Int
     }
 
-    internal static func compact(path: String, cache: [Key: Record], encoders: [TypeID: (Any) throws -> Data])  throws -> StorageLog {
+    internal static func compact(path: String, cache: [Key: Record], encoders: [TypeID: (Any) throws -> Data]) throws -> StorageLog {
         let tempPath = try FSPath.makeTemporaryDirectory() / "compacted.data"
 
         // TODO: This is all rather ugly and likely error prone.
@@ -116,17 +124,17 @@ public actor Storage {
         return try StorageLog(path: newPath)
     }
 
-    public func get<K, V>(key: K, type: V.Type) throws -> V? where K: Codable, V: Codable {
+    public func get<V>(key: some Codable, type: V.Type) throws -> V? where V: Codable {
         let key = try Key(key)
         return try get(key: key, type: type)
     }
 
-    public func get<K, V>(key: K) throws -> V? where K: Codable, V: Codable {
+    public func get<V>(key: some Codable) throws -> V? where V: Codable {
         let key = try Key(key)
         return try get(key: key, type: V.self)
     }
 
-    public func set<K, V>(key: K, value: V) throws where K: Codable, V: Codable {
+    public func set(key: some Codable, value: some Codable) throws {
         let key = try Key(key)
         try update(key: key, newValue: value)
     }
@@ -330,6 +338,7 @@ public class StorageLog {
         let decoder = JSONDecoder()
         var cache: [Key: (TypeID, Data)] = [:]
         let data = try Data(contentsOf: URL(filePath: path))
+        var recordCount = 0
         try data.withUnsafeBytes { buffer in
             var offset = buffer.startIndex
             while offset < buffer.endIndex {
@@ -351,8 +360,10 @@ public class StorageLog {
                 case .session(let uuid, let date):
                     logger?.info("Session: \(uuid) \(date)")
                 }
+                recordCount += 1
             }
         }
+        logger?.log("Read \(recordCount) records, got \(cache.count) keys.")
         return cache
     }
 

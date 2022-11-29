@@ -84,7 +84,7 @@ struct NewPostView: View {
     var body: some View {
         VStack {
             DebugDescriptionView(newPost)
-            .debuggingInfo()
+                .debuggingInfo()
             if let inReplyTo {
                 Text("Replying to \(inReplyTo.account.name)")
             }
@@ -107,7 +107,7 @@ struct NewPostView: View {
                 Rectangle().stroke(Color.accentColor, lineWidth: 8)
             }
         }
-//        .foregroundColor(isTargeted ? .accentColor : .secondary)
+        .foregroundColor(isTargeted ? .accentColor : .secondary)
         .onDrop(of: [.image], isTargeted: $isTargeted) { providers, _ in
             guard providers.count == 1 else {
                 return false
@@ -117,12 +117,14 @@ struct NewPostView: View {
             }
             Task {
                 let resource = try await Resource(provider: provider)
-                guard let filename = resource.filename, let contentType = try resource.contentType else {
+                guard let filename = resource.filename else {
                     fatalError("No filename or no contentType.")
                 }
-                // TODO
-//                let upload = Upload(filename: filename, contentType: contentType, thumbnail: resource.content, content: try resource.data)
-//                mediaUploads.append(upload)
+
+                let upload = try MediaUpload(name: filename, data: try resource.data)
+                mediaUploads.append(upload)
+                // TODO:
+//                selection = upload.id
             }
             return true
         }
@@ -134,11 +136,11 @@ struct NewPostView: View {
             PhotosPicker(selection: $photosPickerItem, preferredItemEncoding: .compatible) {
                 Image(systemName: "photo")
             }
-            
+
             Button(systemImage: "eye.trianglebadge.exclamationmark", action: {
                 newPost.sensitive.toggle()
             })
-            
+
             Picker("Language", selection: $newPost.language) {
                 Text("\(Locale.current.localizedString(forIdentifier: Locale.current.topLevelIdentifier)!) (current)").tag(String?.none)
                 Divider()
@@ -148,7 +150,7 @@ struct NewPostView: View {
             }
             .pickerStyle(.menu)
             .fixedSize()
-            
+
             Picker("Visibility", selection: $newPost.visibility) {
                 ForEach(Status.Visibility.allCases, id: \.self) { visibility in
                     Text(visibility.rawValue).tag(visibility)
@@ -156,14 +158,15 @@ struct NewPostView: View {
             }
             .pickerStyle(.menu)
             .fixedSize()
-            
+
             Spacer()
-            
+
             Text(newPost.status.count, format: .number).monospacedDigit()
-            
+
             Button("Post") {
                 post()
             }
+            .keyboardShortcut(.return, modifiers: .command)
             .disabled(newPost.status.isEmpty || newPost.status.count > 500) // TODO: get limit from instance?
         }
     }
@@ -219,9 +222,10 @@ extension MediaUpload {
 
         descriptiveText = ImageDescription(image: cgImage).descriptiveText
 
-        let path = FSPath.temporaryDirectory / "\(name).\(filenameExtension)"
+        let filename = name.contains(".") ? name : "\(name).\(filenameExtension)"
+        let path = FSPath.temporaryDirectory / filename
         try data.write(to: path.url)
-        self.url = path.url
+        url = path.url
     }
 
     var upload: Upload {
@@ -264,9 +268,7 @@ struct MediaPicker: View {
                     #if os(macOS)
                     .focusable(true)
                     #endif
-                    .quickLookPreview($quicklookURL, in: mediaUploads.map {
-                        $0.url
-                    })
+                    .quickLookPreview($quicklookURL, in: mediaUploads.map(\.url))
                 }
                 .frame(maxHeight: 80)
                 LabeledContent("Media Description") {
@@ -296,33 +298,33 @@ struct MediaPicker: View {
     @ViewBuilder
     func view(for upload: MediaUpload) -> some View {
         upload.thumbnail
-        .resizable().scaledToFit().aspectRatio(1.0, contentMode: .fit)
-#if os(macOS)
-        .focusable(true)
-#endif
-        .focused($selection, equals: upload.id)
+            .resizable().scaledToFit().aspectRatio(1.0, contentMode: .fit)
+        #if os(macOS)
+            .focusable(true)
+        #endif
+            .focused($selection, equals: upload.id)
 
-        .onTapGesture {
-            selection = upload.id
-        }
-        .onLongPressGesture {
-            quicklookURL = upload.url
-        }
-
-        .accessibilityAddTraits(.isButton)
-        .accessibilityLabel("Thumbnail for media upload")
-
-#if os(macOS)
-        .onDeleteCommand(perform: {
-            mediaUploads.removeAll(where: { $0.id == upload.id })
-        })
-#endif
-        // TODO: overlay an X button to delete media.
-        .contextMenu {
-            Button("Remove") {
-                mediaUploads.removeAll(where: { $0.id == upload.id })
+            .onTapGesture {
+                selection = upload.id
             }
-        }
+            .onLongPressGesture {
+                quicklookURL = upload.url
+            }
+
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel("Thumbnail for media upload")
+
+        #if os(macOS)
+            .onDeleteCommand(perform: {
+                mediaUploads.removeAll(where: { $0.id == upload.id })
+            })
+        #endif
+            // TODO: overlay an X button to delete media.
+            .contextMenu {
+                Button("Remove") {
+                    mediaUploads.removeAll(where: { $0.id == upload.id })
+                }
+            }
     }
 
     func updatePhotosPickerItem(_ photosPickerItem: PhotosPickerItem) {
@@ -357,13 +359,13 @@ extension Binding where Value: Identifiable {
     }
 }
 
-//struct Carousel: View {
+// struct Carousel: View {
 //
 //
-//}
+// }
 
-extension ImageSource {
-    public func thumbnail2(at index: Int) throws -> CGImage {
+public extension ImageSource {
+    func thumbnail2(at index: Int) throws -> CGImage {
         let options = [
             kCGImageSourceCreateThumbnailFromImageIfAbsent: true,
             kCGImageSourceCreateThumbnailWithTransform: true,

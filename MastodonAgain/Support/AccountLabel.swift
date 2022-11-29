@@ -30,7 +30,7 @@ struct AccountLabel: View {
         }
         
         if appModel.showAccountHandles {
-            text = text + Text(" ") + Text("@\(account.acct)")
+            text = text + Text(" ") + Text("@\(account.shortUsername)")
                 .foregroundColor(.secondary)
         }
         

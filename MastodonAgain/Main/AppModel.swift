@@ -66,10 +66,11 @@ class AppModel: ObservableObject {
 
     var currentSignin: SignIn? {
         get {
-            appLogger?.log("\(self.signins)")
             guard let currentSigninID else {
                 return nil
             }
+            let s = "SIGNIN: \(currentSigninID), \(signins.map(\.id))"
+            appLogger?.log("\(s)")
             return signins.first(identifiedBy: currentSigninID)
         }
         set {
@@ -103,7 +104,7 @@ class AppModel: ObservableObject {
             let path = try FSPath.specialDirectory(.applicationSupportDirectory) / filename
             storage = try Storage(path: path.path) { registration in
                 registration.registerJSON(type: [SignIn].self)
-            }        // TODO: this can contain sensitive info ("tokens")
+            } // TODO: this can contain sensitive info ("tokens")
             Task {
                 // TODO: Force try
                 // swiftlint:disable:next force_try
